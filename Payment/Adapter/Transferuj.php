@@ -169,8 +169,10 @@ class Payment_Adapter_Transferuj extends Payment_AdapterAbstract
 		$suma_kontrolna = $r['md5sum'];
 		// sprawdzenie stanu transakcji
 		if($status_transakcji=='TRUE' && $blad=='none'){
+            $tr->setStatus($r['trade_status']);
+            $tr->setType(Payment_Transaction::TXTYPE_PAYMENT);
 			$tr->setStatus(Payment_Transaction::STATUS_COMPLETE);
-			$tr->setIsValid(true);
+            $tr->setIsValid(true);
 		}
 		else
 		{
