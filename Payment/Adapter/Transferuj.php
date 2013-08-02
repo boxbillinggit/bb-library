@@ -24,7 +24,7 @@ class Payment_Adapter_Transferuj extends Payment_AdapterAbstract
     {
         return array(
             'supports_one_time_payments'   =>  true,
-            'supports_subscriptions'     =>  false,
+            'supports_subscriptions'     =>  true,
             'description'     =>  'Clients will be redirected to Transferuj.pl to make payment.',
             'form'  => array(
                 'id_sprzedawcy' => array('text', array(
@@ -50,14 +50,15 @@ class Payment_Adapter_Transferuj extends Payment_AdapterAbstract
 	 
 	 public function getHtml($api_admin, $invoice_id, $subscription) {
 		 $invoice = $api_admin->invoice_get(array('id'=>$invoice_id));
+		 $buyer = $invoice['buyer'];
 		 
 		 $params = array(
 			'id' 					=>  $this->config['id_sprzedawcy'],
 			'kwota'					=>	$invoice['total'],
-			'opis'					=>  '',
-			'crc'					=>  'BoxBilling',
+			'opis'					=>  $invoice['nr'],
+			/*'crc'					=>  'BoxBilling',*/
 			'wyn_url'				=>	$this->config['notify_url'],
-			'wyn_email'				=>	$this->config['email'],
+			'wyn_email'				=>	$buyer['email'],
 			'opis_sprzed'			=>  $invoice['nr'],
 			'pow_url'				=>	$this->config['return_url'],
 			'pow_url_blad'			=>  $this->config['return_url'],
@@ -113,47 +114,20 @@ class Payment_Adapter_Transferuj extends Payment_AdapterAbstract
 		return 'https://secure.transferuj.pl';
     }
 
-	public function singlePayment(Payment_Invoice $invoice) {
-		$c = $invoice->getBuyer();
-		$params = array(
-			'id' 					=>  $this->getParam('id_sprzedawcy'),
-			'kwota'					=>	$invoice->getTotal(),
-			'opis'					=>  '',
-			'crc'					=>  'BoxBilling',
-			'wyn_url'				=>	$this->getParam('notify_url'),
-			'wyn_email'				=>	$this->getParam('email'),
-			'opis_sprzed'			=>  $invoice->getNumber(),
-			'pow_url'				=>	$this->getParam('return_url'),
-			'pow_url_blad'			=>  $this->getParam('return_url'),
-			'email'					=>  $c->getEmail(),
-			'transaction_id'		=>	$invoice->getNumber(),
-			'pow_url'				=>	$this->getParam('return_url'),
-			'cancel_url'			=>	$this->getParam('cancel_url'),
-			'imie'					=>	$c->getFirstname(),
-			'nazwisko'				=>	$c->getLastname(),
-			'adres'					=>	$c->getAddress(),
-			'telefon'				=>	$c->getPhone(),
-			'miasto'				=>	$c->getCity(),
-			'kod'					=>	$c->getZip(),
-			'kraj'					=>	$c->getCountry(),
-			'jezyk'					=>	$this->getParam('jezyk'),
-		);
-		
-		return $params;
-		//return $this->_generateForm($this->getServiceUrl(), $params);
-	}
-
 	public function recurrentPayment(Payment_Invoice $invoice) {
 		// TODO Auto-generated method stub
 		
 	}
-
-	public function getTransaction($data, Payment_Invoice $invoice) {
-		$r = $data['post'];
-		
-		$tr = new Payment_Transaction();
-		$tr->setAmount($r['mb_amount'])
-		   ->setCurrency($r['currency']);
+	
+	public function isIpnValid($data, Payment_Invoice $invoice)
+    {
+		return true;	
+	}
+	
+public function getTransaction($data, Payment_Invoice $invoice) 
+	{
+    
+		$r = $_POST;
 		
 		if($_SERVER['REMOTE_ADDR']=='195.149.229.109' && !empty($_POST)){
 		$id_sprzedawcy = $r['id'];
@@ -169,20 +143,24 @@ class Payment_Adapter_Transferuj extends Payment_AdapterAbstract
 		$suma_kontrolna = $r['md5sum'];
 		// sprawdzenie stanu transakcji
 		if($status_transakcji=='TRUE' && $blad=='none'){
-            $tr->setStatus($r['trade_status']);
-            $tr->setType(Payment_Transaction::TXTYPE_PAYMENT);
-			$tr->setStatus(Payment_Transaction::STATUS_COMPLETE);
-            $tr->setIsValid(true);
+		
+		$tx = new Payment_Transaction();
+        $tx->setId($r['tr_id']);
+        $tx->setAmount($r['tr_amount']);
+        $tx->setCurrency("PLN");
+        $tx->setStatus(Payment_Transaction::STATUS_COMPLETE);
+        $tx->setType(Payment_Transaction::TXTYPE_PAYMENT);
+        return $tx;
+			
 		}
 		else
 		{
 		// transakcja wykonana niepoprawnie
+		
 		}
 		}
 		
-		return $tr;
+		
 	}
-
-	
 	
 }
