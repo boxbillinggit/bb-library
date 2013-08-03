@@ -87,7 +87,7 @@ class Server_Manager_Ispconfig3 extends Server_Manager
         	}
 
         	$client = $a->getClient();
-        	//$client->setAId($id);
+        	$client->setId($id);
 
 	        $this->createSite($a);
         	$this->dnsCreateZone($a);
@@ -213,7 +213,7 @@ class Server_Manager_Ispconfig3 extends Server_Manager
         $package    = $a->getPackage();
         $server     = $this->getServerInfo();
 
-        $site_params['client_id']       = 0;
+        $site_params['client_id']       = $client->getId();
         $site_params['domain']          = $a->getDomain();
         $site_params['type'] 			= 'vhost';	// harcoded in ISPConfig vhost
         $site_params['vhost_type'] 		= 'name';	// harcoded in ISPConfig vhost
@@ -221,7 +221,7 @@ class Server_Manager_Ispconfig3 extends Server_Manager
         $site_params['system_user'] 	= 1;//1; force to the admin
         $site_params['system_group'] 	= 1; //as added by the admin
 
-        $site_params['client_group_id'] = 0 + 1;	 //always will be this 	groupd id + 1
+        $site_params['client_group_id'] = $client->getid() + 1;	 //always will be this 	groupd id + 1
         $site_params['server_id'] 		= $this->getServerId();
 
         //Set the defaults
@@ -251,10 +251,28 @@ class Server_Manager_Ispconfig3 extends Server_Manager
     {
         $client     = $a->getClient();
 
+		// ---- Setting up the DNS ZONE
+        $dns_domain_params['server_id'] = $this->getServerId();
+        $dns_domain_params['client_id'] = $client->getid();
+		$dns_domain_params['origin']	= $a->getDomain().'.';
+		$dns_domain_params['ns']	  = $a->getNs1();
+        $dns_domain_params['zone'] = $client->getid();
+        $dns_domain_params['name'] = $a->getDomain().'.'; //adding a final dot
+        $dns_domain_params['type'] = 'A';
+        $dns_domain_params['data'] = $a->getIp();
+		$dns_domain_params['mbox'] 		= 'mail.'.$a->getDomain().'.';//@todo
+        $dns_domain_params['refresh'] 	= '28800';
+        $dns_domain_params['retry'] 	= '7200';
+        $dns_domain_params['expire']	= '86400';
+        $dns_domain_params['minimum']	= '86400';
+        $dns_domain_params['ttl'] = '86400';
+        $dns_domain_params['active'] = 'Y';
+        $this->_request('dns_zone_add', $dns_domain_params);
+		
         //Adding the DNS record A
         $dns_a_params['server_id'] = $this->getServerId();
-        $dns_a_params['client_id'] = 0;
-        $dns_a_params['zone'] = '90';
+        $dns_a_params['client_id'] = $client->getid();
+        $dns_a_params['zone'] = $client->getid();
         $dns_a_params['name'] = $a->getDomain().'.'; //adding a final dot
         $dns_a_params['type'] = 'A';
         $dns_a_params['data'] = $a->getIp();
@@ -262,30 +280,36 @@ class Server_Manager_Ispconfig3 extends Server_Manager
         $dns_a_params['active'] = 'Y';
 
         $this->_request('dns_a_add', $dns_a_params);
-        /*
+		
+		
+      /*  $dns_a_params['server_id'] = $this->getServerId();
+        $dns_a_params['client_id'] = $client->getid();
+		$dns_a_params['origin']	= $a->getDomain();
+		$dns_a_params['ns']	  = $a->getNs1();
+        $dns_a_params['zone'] = '90';
+        $dns_a_params['name'] = $a->getDomain().'.'; //adding a final dot
+        $dns_a_params['type'] = 'A';
+        $dns_a_params['data'] = $a->getIp();
+		$dns_a_params['mbox'] 		= 'mail.'.$a->getDomain().'.';//@todo
+        $dns_a_params['refresh'] 	= '28800';
+        $dns_a_params['retry'] 	= '7200';
+        $dns_a_params['expire']	= '86400';
+        $dns_a_params['minimum']	= '86400';
+        $dns_a_params['ttl'] = '86400';
+        $dns_a_params['active'] = 'Y';
+
+        $this->_request('dns_zone_add', $dns_a_params);  */
+		
+		
+        
         // ---- Setting up the mail domain
-        $mail_domain_params['client_id'] 	= $client->getAId();
+        $mail_domain_params['client_id'] 	= $client->getId();
         $mail_domain_params['server_id']  	= $this->getServerId();
         $mail_domain_params['domain']	 	= $a->getDomain();
         $mail_domain_params['active'] 	 	= 'y';
 
-        $domain_id = $this->_request('mail_domain_add', $mail_domain_params);
-
-        // ---- Setting up the DNS ZONE
-        $dns_domain_params['client_id'] = $client->getAId();
-        $dns_domain_params['server_id'] = $this->getServerId();
-        $dns_domain_params['origin']	= $a->getDomain();
-
-        $dns_domain_params['ns']		= '8.8.8.8';
-        $dns_domain_params['mbox'] 		= 'mbox.beeznest.com.';//@todo
-        $dns_domain_params['refresh'] 	= 28800;
-        $dns_domain_params['retry'] 	= 7200;
-        $dns_domain_params['expire']	= 604800;
-        $dns_domain_params['minimum']	= 604800;
-        $dns_domain_params['ttl']		= 604800;
-        $dns_domain_params['active'] 	= 'y';
-        $result = $this->remote('dns_zone_add', $dns_domain_params);
-        */
+        $this->_request('mail_domain_add', $mail_domain_params);
+        
 
         return true;
     }
