@@ -132,6 +132,12 @@ class Server_Manager_Ispconfig3 extends Server_Manager
         );
 
         $result = $this->_request('client_delete', $params);
+		
+		$pa['origin'] = $a->getDomain().'.'; 
+		$info = $this->_request('test', $pa);
+		
+		$this->_request('dns_zone_delete', $info);
+		
 
         return (bool) $result;
     }
@@ -250,6 +256,7 @@ class Server_Manager_Ispconfig3 extends Server_Manager
     private function dnsCreateZone(Server_Account &$a)
     {
         $client     = $a->getClient();
+		
 
 		// ---- Setting up the DNS ZONE
         $dns_domain_params['server_id'] = $this->getServerId();
@@ -261,25 +268,86 @@ class Server_Manager_Ispconfig3 extends Server_Manager
         $dns_domain_params['type'] = 'A';
         $dns_domain_params['data'] = $a->getIp();
 		$dns_domain_params['mbox'] 		= 'mail.'.$a->getDomain().'.';//@todo
-        $dns_domain_params['refresh'] 	= '28800';
-        $dns_domain_params['retry'] 	= '7200';
-        $dns_domain_params['expire']	= '86400';
+        $dns_domain_params['refresh'] 	= '7200';
+        $dns_domain_params['retry'] 	= '540';
+        $dns_domain_params['expire']	= '604800';
         $dns_domain_params['minimum']	= '86400';
-        $dns_domain_params['ttl'] = '86400';
+        $dns_domain_params['ttl'] = '3600';
         $dns_domain_params['active'] = 'Y';
         $this->_request('dns_zone_add', $dns_domain_params);
+		
+		$pa['origin'] = $a->getDomain().'.'; 
+		$info = $this->_request('test', $pa);
 		
         //Adding the DNS record A
         $dns_a_params['server_id'] = $this->getServerId();
         $dns_a_params['client_id'] = $client->getid();
-        $dns_a_params['zone'] = $client->getid();
+        $dns_a_params['zone'] = $info;
         $dns_a_params['name'] = $a->getDomain().'.'; //adding a final dot
         $dns_a_params['type'] = 'A';
         $dns_a_params['data'] = $a->getIp();
-        $dns_a_params['ttl'] = '86400';
+        $dns_a_params['ttl'] = '3600';
         $dns_a_params['active'] = 'Y';
 
         $this->_request('dns_a_add', $dns_a_params);
+		
+		//Adding the DNS record A
+        $dns_a_params['server_id'] = $this->getServerId();
+        $dns_a_params['client_id'] = $client->getid();
+        $dns_a_params['zone'] = $info;
+        $dns_a_params['name'] = 'www'; //adding a final dot
+        $dns_a_params['type'] = 'A';
+        $dns_a_params['data'] = $a->getIp();
+        $dns_a_params['ttl'] = '3600';
+        $dns_a_params['active'] = 'Y';
+
+        $this->_request('dns_a_add', $dns_a_params);
+		
+		//Adding the DNS record A
+        $dns_a_params['server_id'] = $this->getServerId();
+        $dns_a_params['client_id'] = $client->getid();
+        $dns_a_params['zone'] = $info;
+        $dns_a_params['name'] = 'mail'; //adding a final dot
+        $dns_a_params['type'] = 'A';
+        $dns_a_params['data'] = $a->getIp();
+        $dns_a_params['ttl'] = '3600';
+        $dns_a_params['active'] = 'Y';
+
+        $this->_request('dns_a_add', $dns_a_params);
+		
+		//Adding the DNS record NS1
+		$dns_ns_add = array(
+			'server_id' => $this->getServerId(),
+			'zone' => $info,
+			'name' => $a->getDomain().'.',
+			'type' => 'ns',
+			'data' => $a->getNs1().'.',
+			'aux' => '0',
+			'ttl' => '86400',
+			'active' => 'Y',
+			'stamp' => 'CURRENT_TIMESTAMP',
+			'serial' => '1',
+			'client_id' => $client->getId(),
+			);
+
+        $this->_request('dns_ns_add', $dns_ns_add);
+		
+		//Adding the DNS record NS2
+		$dns_ns_add = array(
+			'server_id' => $this->getServerId(),
+			'zone' => $info,
+			'name' => $a->getDomain().'.',
+			'type' => 'ns',
+			'data' => $a->getNs2().'.',
+			'aux' => '0',
+			'ttl' => '3600',
+			'active' => 'Y',
+			'stamp' => 'CURRENT_TIMESTAMP',
+			'serial' => '1',
+			'client_id' => $client->getId(),
+			);
+
+        $this->_request('dns_ns_add', $dns_ns_add);
 		
 		
       /*  $dns_a_params['server_id'] = $this->getServerId();
@@ -461,7 +529,9 @@ class Server_Manager_Ispconfig3 extends Server_Manager
         if(!$this->_c instanceof SoapClient ) {
             // Create the SOAP Client
             $this->_c = new SoapClient(null, array('location' => $soap_location,
-                                                 'uri'      => $soap_uri));
+                                                 'uri'      => $soap_uri,
+												 'trace' => 1,
+									 'exceptions' => 1));
         }
 
         //* Login to the remote server
@@ -637,6 +707,15 @@ class Server_Manager_Ispconfig3 extends Server_Manager
                 case 'client_templates_get_all':
                     $soap_result 	= $soap_client->client_templates_get_all($this->_session);
                 break;
+				case 'test' :
+                    $soap_result 	= $soap_client->dns_zone_get_id($this->_session, $params['origin']);
+                break;
+				case 'dns_ns_add' :
+					$soap_result    = $soap_client->dns_ns_add($this->_session,$params['client_id'], $params);
+				break;
+				case 'dns_zone_delete' :
+					$soap_result    = $soap_client->dns_zone_delete($this->_session, $params);
+				break;
                 case 'logout' :
                     $soap_result 	= $soap_client->logout($this->_session);
                 break;
